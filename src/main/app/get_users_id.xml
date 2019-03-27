@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:validation="http://www.mulesoft.org/schema/mule/validation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <validation:config name="Validation_Configuration" doc:name="Validation Configuration"/>
+    <sub-flow name="get_users_id">
+        <db:select config-ref="Generic_Database_Configuration" doc:name="Lookup user by id">
+            <db:parameterized-query><![CDATA[select id, firstname, lastname, username from users where id = :id]]></db:parameterized-query>
+            <db:in-param name="id" value="#[flowVars.id]"/>
+        </db:select>
+        <validation:is-not-empty config-ref="Validation_Configuration" message="No user found" exceptionClass="org.mule.module.apikit.exception.NotFoundException" value="#[payload]" doc:name="user found"/>
+        <dw:transform-message doc:name="extract json user">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  id: payload[0].id,
+  user: payload[0].username,
+  name: payload[0].lastname,
+  (firstname: payload[0].firstname) when payload[0].firstname != ""
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </sub-flow>
+
+</mule>

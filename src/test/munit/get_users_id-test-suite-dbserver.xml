@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:dbserver="http://www.mulesoft.org/schema/mule/dbserver" xmlns:assert-object-equals="http://www.mulesoft.org/schema/mule/assert-object-equals" xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd
+http://www.mulesoft.org/schema/mule/assert-object-equals http://www.mulesoft.org/schema/mule/assert-object-equals/current/mule-assert-object-equals.xsd
+http://www.mulesoft.org/schema/mule/dbserver http://www.mulesoft.org/schema/mule/dbserver/current/mule-dbserver.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration" mock-connectors="false" mock-inbounds="false"/>
+    <context:property-placeholder location="api.dbserver.properties" />
+    <spring:beans>
+        <spring:import resource="classpath:config.xml"/>
+        <spring:import resource="classpath:get_users_id.xml"/>
+    </spring:beans>
+    <dbserver:config name="DB_Server" database="postgres" connectionStringParameters="MODE=PostgreSQL" doc:name="DB Server" sqlFile="USERS.sql"/>
+    <munit:before-suite name="dbserverBefore_Suite" description="MUnit Test">
+        <dbserver:start-db-server config-ref="DB_Server" doc:name="Start DB Server"/>
+    </munit:before-suite>
+    <munit:after-suite name="dbserverAfter_Suite" description="Ater suite actions">
+        <dbserver:stop-db-server config-ref="DB_Server" doc:name="Stop DB Server"/>
+    </munit:after-suite>
+    <munit:before-test name="dbserverBefore_Test" description="Before tests actions">
+        <dbserver:execute config-ref="DB_Server" sql="TRUNCATE TABLE users" doc:name="Trunc users"/>
+        <dbserver:execute config-ref="DB_Server" sql="INSERT INTO users (id, username, lastname, firstname) VALUES(1234, 'jdoe', 'Doe', 'John')" doc:name="Insert user"/>
+    </munit:before-test>
+    <munit:test name="get_users_idTest-happy-path" description="Happy-Path Test">
+        <set-variable variableName="id" value="#[1234]" doc:name="set id=1234"/>
+        <flow-ref name="get_users_id" doc:name="get_users_id"/>
+        <assert-object-equals:compare-objects expected-ref="#[getResource('user-expected.json').asStream()]" doc:name="user is returned "  />
+    </munit:test>
+    <munit:test name="get_users_idTest-user-not-found" description="Expects a NotFoundException" expectException="org.mule.module.apikit.exception.NotFoundException">
+        <set-variable variableName="id" value="#[2]" doc:name="set id=2"/>
+        <flow-ref name="get_users_id" doc:name="get_users_id"/>
+    </munit:test>
+
+</mule>

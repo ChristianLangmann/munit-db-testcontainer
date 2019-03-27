@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:assert-object-equals="http://www.mulesoft.org/schema/mule/assert-object-equals" xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd
+http://www.mulesoft.org/schema/mule/assert-object-equals http://www.mulesoft.org/schema/mule/assert-object-equals/current/mule-assert-object-equals.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:config.xml"/>
+        <spring:import resource="classpath:get_users_id.xml"/>
+    </spring:beans>
+    <munit:test name="get_users_idTest-happy-path" description="Test">
+        <mock:when doc:name="DB returns 1 record" messageProcessor=".*:.*">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Lookup user by id']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[[[&quot;id&quot;: 1234, &quot;firstname&quot;: &quot;John&quot;, &quot;lastname&quot;: &quot;Doe&quot;, &quot;username&quot;: &quot;jdoe&quot;]]]" mimeType="application/java"/>
+        </mock:when>
+        <set-variable variableName="id" value="#[1234]" doc:name="set id"/>
+        <flow-ref name="get_users_id" doc:name="get_users_id"/>
+        <assert-object-equals:compare-objects expected-ref="#[getResource('user-expected.json').asStream()]" doc:name="user is returned "  />
+    </munit:test>
+    <munit:test name="get_users_idTest-user-not-found" description="Expects a NotFoundException" expectException="org.mule.module.apikit.exception.NotFoundException">
+        <mock:when doc:name="DB returns empty list" messageProcessor=".*:.*">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Lookup user by id']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[[]]" mimeType="application/java"/>
+        </mock:when>
+        <set-variable variableName="id" value="#[1234]" doc:name="set id"/>
+        <flow-ref name="get_users_id" doc:name="get_users_id"/>
+    </munit:test>
+
+</mule>

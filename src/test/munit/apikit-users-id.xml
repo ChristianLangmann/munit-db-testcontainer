@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:dbserver="http://www.mulesoft.org/schema/mule/dbserver"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:assert-object-equals="http://www.mulesoft.org/schema/mule/assert-object-equals"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/dbserver http://www.mulesoft.org/schema/mule/dbserver/current/mule-dbserver.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/assert-object-equals http://www.mulesoft.org/schema/mule/assert-object-equals/current/mule-assert-object-equals.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration" mock-connectors="false" mock-inbounds="false"/>
+    <context:property-placeholder location="api.dbserver.properties" />
+    <spring:beans>
+        <spring:import resource="classpath:config.xml"/>
+        <spring:import resource="classpath:get_users_id.xml"/>
+        <spring:import resource="classpath:get_users.xml"/>
+        <spring:import resource="classpath:testcontainer.xml"/>
+    </spring:beans>
+    <dbserver:config name="DB_Server" database="postgres" connectionStringParameters="MODE=PostgreSQL" doc:name="DB Server" sqlFile="USERS.sql"/>
+    <http:request-config name="HTTP-APIKit" host="localhost" port="${http.port}" basePath="/api/" doc:name="HTTP Request Configuration">
+        <http:raml-api-configuration location="api.raml"/>
+    </http:request-config>
+    <munit:before-suite name="dbserverBefore_Suite" description="MUnit Test">
+        <dbserver:start-db-server config-ref="DB_Server" doc:name="Start DB Server"/>
+    </munit:before-suite>
+    <munit:after-suite name="dbserverAfter_Suite" description="Ater suite actions">
+        <dbserver:stop-db-server config-ref="DB_Server" doc:name="Stop DB Server"/>
+    </munit:after-suite>
+    <munit:before-test name="dbserverBefore_Test" description="Before tests actions">
+        <dbserver:execute config-ref="DB_Server" sql="TRUNCATE TABLE users" doc:name="Trunc users"/>
+        <dbserver:execute config-ref="DB_Server" sql="INSERT INTO users (id, username, lastname, firstname) VALUES(1234, 'jdoe', 'Doe', 'John')" doc:name="Insert user"/>
+    </munit:before-test>
+    <munit:test name="users-id-get:/users/{id}:apiConfigTest" description="Test">
+        <http:request config-ref="HTTP-APIKit" path="/users/{id}" method="GET" doc:name="HTTP">
+            <http:request-builder>
+                <http:uri-param paramName="id" value="1234"/>
+            </http:request-builder>
+        </http:request>
+        <munit:assert-on-equals expectedValue="#[200]" actualValue="#[message.inboundProperties['http.status']]" doc:name="Assert http.status is 200"/>
+        <assert-object-equals:compare-objects expected-ref="#[getResource('user-expected.json').asStream()]" doc:name="user is returned "  />
+    </munit:test>
+    <munit:test name="users-id-get:/users/{id}:apiConfigTest-nouser" description="Test apikit-flow with missing user">
+        <http:request config-ref="HTTP-APIKit" path="/users/{id}" method="GET" doc:name="HTTP">
+            <http:request-builder>
+                <http:uri-param paramName="id" value="2"/>
+            </http:request-builder>
+            <http:success-status-code-validator values="404"/>
+        </http:request>
+        <munit:assert-on-equals expectedValue="#[404]" actualValue="#[message.inboundProperties['http.status']]" doc:name="Assert http.status is 404"/>
+    </munit:test>
+</mule>
